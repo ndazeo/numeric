@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>
+		Metodos numericos
+	</title>
+	<style>
+		.step_row:hover{
+			background-color:red;
+		}
+		.tab
+		{
+			background-color:#F0F0F0;
+			float:left;
+			width: 40px;
+			height:19px;
+			border: 1px solid;
+			text-align: center;
+		}
+		.selected_tab
+		{
+			border-bottom: 0;
+			height: 20px;
+		}
+		.new
+		{
+			background-color:#F0F0F0;
+			border: 1px solid;
+			float:right;
+			height:19px;
+		}
+		.content
+		{
+			background-color:#F0F0F0;
+			border: 1px solid;
+			margin-top:20px;
+		}
+	</style>
+	<script src="jquery-1.11.2.min.js"></script>
+	<script type="text/javascript" src="graph.js"></script>
+	<script type="text/javascript" src="metodos.js"></script>
+</head>
+<body>
+	<div style="float: left;">
+		<div id="tabs" style="float:left">
+			<div class="new" onclick="newtab()">&nbsp;+&nbsp;</div>
+		</div>
+		<div id="content_container">
+		</div>
+	</div>
+	<div style="position: fixed; top:5%; right:10%">
+		<canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000000;"></canvas>
+		<div>
+			<div style="float:left">
+				<input type="text" size=4 id="xAtxt" value="-5"/> < x < <input type="text" size=4 id="xBtxt" value="5"/><br>
+				<input type="text" size=4 id="yAtxt" value="-2"/> < y < <input type="text" size=4 id="yBtxt" value="8" /><br>
+			</div>
+			<div style="float:left">
+				<input type="checkbox" id="show_lines" onclick="repaint()" />Conectar puntos<br>
+				<button onclick="refresh()">Actualizar</button>
+			</div>
+			<br>
+		</div>
+	</div>
+	
+	<script type="text/javascript">
+		
+		color = ["#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"];
+		
+		tab_count = 0;
+		tab = 0;
+		
+		// Se crea el grafico
+		graph = new Graph($("#graphCanvas")[0].getContext("2d"));
+		
+		content = [];
+		tabs = [];
+		
+		// funcion explicita
+		function f(x,y){ return eval($("#explicita").val()) }
+		
+		function createTab()
+		{
+			return '<table><tr><td>f(x,y) =</td><td><input type="text" id="explicita" onchange="repaint()" value="-x+2*y" /></td></tr><tr><td>h :</td><td><input type="text" id="h" onchange="repaint()" value="0.5" /></td></tr><tr><td>Pasos:</td><td><input type="text" id="pasos" onchange="repaint()" value="1" /></td><td><button onclick="addStep()">+</button></td></tr></table><br>Metodo: <select id="metodo" onchange="repaint()"><option value="euler">Euler</option><option value="euler_mej">Euler mejorado</option><option value="rungekutta">Runge kutta</option></select><br><br><br><div id="div_steps"></div>';
+		}
+		
+		function newtab()
+		{
+			var tg_f = function(i){return function(){toogleTab(i)}};
+			
+			var tb = $("<a class='tab' id='tab_"+tab_count+"'>")
+				.text(tab_count)
+				.on("click",tg_f(tab_count));
+				
+			$("#tabs").append(tb);
+			tabs[tab_count] = tb;
+			
+			var ct = $("<div>")
+				.addClass("content")
+				.html(createTab())
+				.hide();
+			
+			$("#content_container").append(ct);
+			content[tab_count] = ct;
+			calcular(tab_count);
+			toogleTab(tab_count);
+			tab_count+=1;
+		}
+		
+		
+		function toogleTab(i)
+		{
+			$(".selected_tab").removeClass("selected_tab");
+			content[tab].hide();
+			tab = i;
+			content[tab].show();
+			tabs[tab].addClass("selected_tab");
+		}
+		
+		function addStep()
+		{
+			var pasos = parseInt(content[tab].find("#pasos").val());
+			content[tab].find("#pasos").val(pasos + 1);
+			repaint();
+		}
+		
+		
+		function mouseEnter(e)
+		{
+			var x = parseFloat($(this).find("[name=x]").attr("info"));
+			var y = parseFloat($(this).find("[name=y]").attr("info"));
+			var a = parseFloat($(this).find("[name=a]").attr("info"));
+			
+			tg = graph.addLine(xA,y+(xA-x)*a,xB,y+(xB-x)*a);
+			
+			graph.coordinates(x,y);
+		}
+		
+		function mouseLeave()
+		{
+			graph.removeLine(tg);
+		}
+		
+		function calcular(i)
+		{
+			var nombre_metodo = content[i].find("#metodo option:selected").val();
+			
+			// Se reinicia la tabla
+			content[i].find("#div_steps").html("<table border=1 id='steps'><tr><th>x</th><th>y(x)</th></tr><tr id='row0' class='step_row'><td name='x'><input onchange='repaint()' size=4 type='text' id='x' value='"+($("#x")[0]?$("#x").val():"0")+"'></td><td name='y'><input onchange='repaint()' size=4 type='text' id='y_x' value='"+($("#y_x")[0]?$("#y_x").val():"0")+"'></td></tr></table>");
+			
+			for(h in tabla[nombre_metodo])
+				$(content[i].find("#div_steps table tr")[0]).append($("<th>").text(tabla[nombre_metodo][h]))
+			
+			
+			// parametros
+			var h = parseFloat(content[i].find("#h").val());
+			var n = parseInt(content[i].find("#pasos").val());
+			
+			var X = [];
+			var Y = [];
+			
+			// Valores iniciales
+			X[0] = parseFloat(content[i].find("#x").val());
+			Y[0] = parseFloat(content[i].find("#y_x").val());
+			
+			var result = metodo[nombre_metodo](X, Y, f, h, n);
+			
+			for(r in result["x"])
+			{			
+				var tr;
+				
+				var x = result["x"][r];
+				var y = result["y"][r];
+				
+				if(x == X[0] && y == Y[0] )
+				{
+					tr = content[i].find("#row0");
+				}
+				else
+				{
+					tr = $("<tr>");
+					tr.append($("<td name='x'>"+(""+x).substr(0,10)+"</td>"));
+					tr.append($("<td name='y'>"+(""+y).substr(0,10)+"</td>"));
+				}
+				for(d in tabla[nombre_metodo])
+					if(result[d][r])
+						tr.append($("<td name='"+d+"'>").text((""+result[d][r]).substr(0,10)).attr("info",result[d][r]));
+				
+				tr.find("[name=x]").attr("info",x);
+				tr.find("[name=y]").attr("info",y);
+				
+				tr.addClass("step_row");
+				tr.on("mouseenter",mouseEnter);
+				tr.on("mouseleave",mouseLeave);
+				content[i].find("#steps").append(tr);
+			}
+			
+			graph.addPoints(i,{x:X,y:Y}, color[i]);
+			graph.paintObjects();
+		}
+		function repaint()
+		{
+			// Limites
+			xA = parseFloat($("#xAtxt").val());
+			xB = parseFloat($("#xBtxt").val());
+			yA = parseFloat($("#yAtxt").val());
+			yB = parseFloat($("#yBtxt").val());
+			
+			graph.setLimits(xA, xB, yA, yB);
+			
+			graph.showLines = $("#show_lines").is( ":checked" )
+						
+			graph.clearPoints(tab);
+			
+			calcular(tab);
+			
+			graph.paintObjects();
+		}
+		
+		function refresh()
+		{
+			xA = parseFloat($("#xAtxt").val());
+			xB = parseFloat($("#xBtxt").val());
+			yA = parseFloat($("#yAtxt").val());
+			yB = parseFloat($("#yBtxt").val());
+			
+			graph.setLimits(xA, xB, yA, yB);
+			
+			graph.showLines = $("#show_lines").is( ":checked" )
+						
+			for(i in tabs)
+			{
+				graph.clearPoints(i);
+				calcular(i);
+			}
+			graph.paintObjects();
+		}
+		
+		newtab();
+		repaint();
+	</script>
+</body>
+</html>
